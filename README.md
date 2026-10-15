@@ -27,11 +27,13 @@
 
 ### pc端
 
-![1](./images/1.png)![2](./images/2.png)![3](./images/3.png)![4](./images/4.png)![5](./images/5.png)![6](./images/6.png)
+<img src="./images/1.png" width="32%"/> <img src="./images/2.png" width="32%"/> <img src="./images/3.png" width="32%"/>
+
+<img src="./images/4.png" width="32%"/> <img src="./images/5.png" width="32%"/> <img src="./images/6.png" width="32%"/>
 
 ### 手机端
 
-![](./images/a1.jpg)![](./images/a2.jpg)![](./images/a3.jpg)![](./images/a4.jpg)![](./images/a5.jpg)
+<img src="./images/a1.jpg" width="17%"/> <img src="./images/a2.jpg" width="17%"/> <img src="./images/a3.jpg" width="17%"/> <img src="./images/a4.jpg" width="17%"/> <img src="./images/a5.jpg" width="17%"/>
 
 | 层 | 技术 |
 | --- | --- |
