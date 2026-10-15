@@ -1,0 +1,40 @@
+/* 全局样式：工具类软件风格，简洁、低动画、适配大屏 */
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  font-size: 14px;
+  color: #303133;
+  background: #f0f2f5;
+  user-select: none;
+}
+
+/* 录入/表格区域允许选中文本 */
+.el-table,
+.el-input,
+.el-textarea,
+.allow-select {
+  user-select: text;
+}
+
+/* 统一页面内边距 */
+.page-wrap {
+  padding: 14px 16px;
+}
+
+/* 统计卡片数字 */
+.stat-number {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+/* 减少不必要的过渡动画 */
+* {
+  transition-duration: 0.05s !important;
+}

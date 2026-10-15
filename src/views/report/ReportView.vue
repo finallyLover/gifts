@@ -1,0 +1,309 @@
+<template>
+  <div class="page-wrap report-page">
+    <el-tabs v-model="activeTab">
+      <!-- ============ 单场礼簿统计 ============ -->
+      <el-tab-pane label="单场礼簿统计" name="archive">
+        <div class="toolbar">
+          <el-select
+            v-model="archiveId"
+            placeholder="选择礼簿档案"
+            style="width: 260px"
+            @change="loadArchiveStat"
+          >
+            <el-option v-for="a in archives" :key="a.id" :label="a.name" :value="a.id" />
+          </el-select>
+          <el-button :disabled="!archiveStatData" @click="exportArchiveExcel">导出明细Excel</el-button>
+        </div>
+
+        <template v-if="archiveStatData">
+          <!-- 指标卡 -->
+          <el-row :gutter="12" class="stat-cards">
+            <el-col :span="6">
+              <el-card shadow="never">
+                <div class="card-label">总笔数</div>
+                <div class="stat-number">{{ archiveStatData.total_count }}</div>
+              </el-card>
+            </el-col>
+            <el-col :span="6">
+              <el-card shadow="never">
+                <div class="card-label">总金额（含礼品折算）</div>
+                <div class="stat-number in-color">¥ {{ archiveStatData.total_amount }}</div>
+                <div class="card-sub">其中礼品折算 ¥ {{ archiveStatData.gift_amount }}</div>
+              </el-card>
+            </el-col>
+            <el-col :span="6">
+              <el-card shadow="never">
+                <div class="card-label">已确认 / 待核对</div>
+                <div class="stat-number">
+                  {{ archiveStatData.confirmed_count }} / {{ archiveStatData.pending_count }}
+                </div>
+              </el-card>
+            </el-col>
+          </el-row>
+
+          <el-row :gutter="12">
+            <!-- 金额档位 -->
+            <el-col :span="12">
+              <div class="table-title">礼金档位分布</div>
+              <el-table :data="archiveStatData.amount_brackets" border size="small">
+                <el-table-column prop="label" label="金额档位" />
+                <el-table-column prop="count" label="笔数" width="100" align="right" />
+                <el-table-column label="金额(元)" width="140" align="right">
+                  <template #default="{ row }">{{ row.amount }}</template>
+                </el-table-column>
+              </el-table>
+            </el-col>
+          </el-row>
+        </template>
+        <el-empty v-else description="请选择礼簿档案" />
+      </el-tab-pane>
+
+      <!-- ============ 全局人情统计 ============ -->
+      <el-tab-pane label="全局人情统计" name="global">
+        <el-row :gutter="12" class="stat-cards">
+          <el-col :span="8">
+            <el-card shadow="never">
+              <div class="card-label">全部收礼总额（含礼品折算）</div>
+              <div class="stat-number in-color">¥ {{ globalStatData.total_in }}</div>
+              <div class="card-sub">{{ globalStatData.in_count }} 笔 · 其中礼品 ¥ {{ globalStatData.gift_in }}</div>
+            </el-card>
+          </el-col>
+          <el-col :span="8">
+            <el-card shadow="never">
+              <div class="card-label">全部回礼总额（含礼品折算）</div>
+              <div class="stat-number out-color">¥ {{ globalStatData.total_out }}</div>
+              <div class="card-sub">{{ globalStatData.out_count }} 笔 · 其中礼品 ¥ {{ globalStatData.gift_out }}</div>
+            </el-card>
+          </el-col>
+          <el-col :span="8">
+            <el-card shadow="never">
+              <div class="card-label">整体人情净差额（收-出）</div>
+              <div class="stat-number"
+                :class="globalStatData.net_diff >= 0 ? 'in-color' : 'out-color'">
+                ¥ {{ globalStatData.net_diff }}
+              </div>
+              <div class="card-sub">
+                收 {{ globalStatData.in_count }} 笔 − 出 {{ globalStatData.out_count }} 笔
+              </div>
+            </el-card>
+          </el-col>
+        </el-row>
+
+        <div class="table-title">待回礼人员清单</div>
+        <el-table :data="globalStatData.pending_persons" border size="small">
+          <el-table-column prop="name" label="姓名" width="160" />
+          <el-table-column label="对方赠我合计" width="180" align="right">
+            <template #default="{ row }">¥ {{ row.total_in }}</template>
+          </el-table-column>
+          <el-table-column prop="last_date" label="最近收礼时间" min-width="180" />
+        </el-table>
+      </el-tab-pane>
+
+      <!-- ============ 人情对照表 ============ -->
+      <el-tab-pane label="人情对照表" name="compare" class="flex-pane">
+        <div class="toolbar">
+          <el-input
+            v-model="compareKeyword"
+            placeholder="按姓名过滤"
+            clearable
+            style="width: 240px"
+            @keyup.enter="loadCompare"
+          />
+          <el-button type="primary" @click="loadCompare">查询</el-button>
+          <el-button @click="exportCompareExcel">导出对照表Excel</el-button>
+        </div>
+
+        <!-- 表格撑满页面剩余高度，行数多时表内滚动 -->
+        <div class="fill-table">
+          <el-table :data="compareRows" border size="small" height="100%">
+            <el-table-column prop="name" label="姓名" width="130" />
+            <el-table-column label="对方赠我合计" width="150" align="right">
+              <template #default="{ row }">¥ {{ row.total_in }}</template>
+            </el-table-column>
+            <el-table-column label="我赠对方合计" width="150" align="right">
+              <template #default="{ row }">¥ {{ row.total_out }}</template>
+            </el-table-column>
+            <el-table-column label="其中礼品(收/回)" width="140" align="right">
+              <template #default="{ row }">¥ {{ row.gift_in }} / ¥ {{ row.gift_out }}</template>
+            </el-table-column>
+            <el-table-column label="差额(收-出)" width="150" align="right">
+              <template #default="{ row }">
+                <span :class="row.diff >= 0 ? 'in-color' : 'out-color'">¥ {{ row.diff }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="收/回笔数" width="120" align="center">
+              <template #default="{ row }">
+                <!-- 点击笔数打开该人的往来详情 -->
+                <el-button link type="primary" @click="openPersonDetail(row)">
+                  {{ row.in_count }} / {{ row.out_count }}
+                </el-button>
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="100" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.return_status === 'returned' ? 'success' : 'warning'">
+                  {{ row.return_status === 'returned' ? '已回礼' : '待回礼' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </el-tab-pane>
+    </el-tabs>
+
+    <!-- 个人往来详情抽屉（点击对照表笔数打开） -->
+    <PersonDetailDrawer v-model="detailVisible" :person-id="detailPersonId" />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { onMounted, ref } from 'vue'
+import type {
+  Archive, ArchiveStat, GlobalStat, PersonSummary
+} from '@/types'
+import { listArchives } from '@/api/archive'
+import {
+  getArchiveStat, getComparisonReport, getGlobalStat
+} from '@/api/stats'
+import { listRecords } from '@/api/record'
+import { exportArrayExcel } from '@/utils/excel'
+import PersonDetailDrawer from '@/views/relation/components/PersonDetailDrawer.vue'
+
+const activeTab = ref('archive')
+const archives = ref<Archive[]>([])
+
+// ---- 单场统计 ----
+const archiveId = ref('')
+const archiveStatData = ref<ArchiveStat | null>(null)
+async function loadArchiveStat() {
+  if (!archiveId.value) return
+  archiveStatData.value = await getArchiveStat(archiveId.value)
+}
+
+// ---- 全局统计 ----
+const globalStatData = ref<GlobalStat>({
+  total_in: 0, total_out: 0, gift_in: 0, gift_out: 0, net_diff: 0,
+  in_count: 0, out_count: 0, pending_persons: []
+})
+
+// ---- 对照表 ----
+const compareKeyword = ref('')
+const compareRows = ref<PersonSummary[]>([])
+async function loadCompare() {
+  compareRows.value = await getComparisonReport(compareKeyword.value || undefined)
+}
+
+// ---- 个人往来详情抽屉 ----
+const detailVisible = ref(false)
+const detailPersonId = ref('')
+function openPersonDetail(row: PersonSummary) {
+  detailPersonId.value = row.id
+  detailVisible.value = true
+}
+
+// ---- 导出 ----
+/// 导出当前档案明细
+async function exportArchiveExcel() {
+  const rows = await listRecords({ archive_id: archiveId.value })
+  const data = rows.map((r, i) => ({
+    序号: i + 1,
+    来宾姓名: r.guest_name,
+    礼金金额: r.amount,
+    礼品金额: r.gift_amount ?? 0,
+    合计: (r.amount || 0) + (r.gift_amount || 0),
+    礼品: r.gift ?? '',
+    备注: r.remark ?? '',
+    核对状态: r.status === 'confirmed' ? '已确认' : '待核对'
+  }))
+  const name = archives.value.find((a) => a.id === archiveId.value)?.name ?? '礼簿'
+  exportArrayExcel(`${name}-明细.xlsx`, '礼簿明细', data)
+}
+
+/// 导出对照表
+function exportCompareExcel() {
+  const rows = compareRows.value.map((r) => ({
+    姓名: r.name,
+    对方赠我合计: r.total_in,
+    其中礼品折算_收: r.gift_in,
+    我赠对方合计: r.total_out,
+    其中礼品折算_回: r.gift_out,
+    差额: r.diff,
+    收礼笔数: r.in_count,
+    回礼笔数: r.out_count,
+    状态: r.return_status === 'returned' ? '已回礼' : '待回礼'
+  }))
+  exportArrayExcel('人情往来对照表.xlsx', '人情对照', rows)
+}
+
+onMounted(async () => {
+  archives.value = await listArchives(undefined, true)
+  globalStatData.value = await getGlobalStat()
+  await loadCompare()
+})
+</script>
+
+<style scoped>
+.report-page {
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* el-tabs 纵向撑满整个页面高度 */
+.report-page :deep(.el-tabs) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.report-page :deep(.el-tabs__content) {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+/* 普通面板：内容超高时面板自身滚动 */
+.report-page :deep(.el-tab-pane) {
+  height: 100%;
+  overflow-y: auto;
+}
+/* 需要表格撑满的面板：纵向弹性布局 */
+.report-page :deep(.flex-pane) {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+/* 表格填充容器：占满剩余高度 */
+.fill-table {
+  flex: 1;
+  min-height: 0;
+}
+.toolbar {
+  display: flex;
+  gap: 10px;
+  margin: 6px 0 14px;
+  flex: none;
+}
+.stat-cards {
+  margin-bottom: 16px;
+}
+.card-label {
+  font-size: 13px;
+  color: #909399;
+}
+.card-sub {
+  font-size: 12px;
+  color: #909399;
+}
+.in-color {
+  color: #e64340;
+}
+.out-color {
+  color: #2b7d2b;
+}
+.table-title {
+  font-weight: 600;
+  margin: 4px 0 8px;
+}
+</style>

@@ -1,0 +1,54 @@
+[package]
+name = "gift-ledger"
+version = "0.1.0"
+description = "本地桌面端电子礼簿"
+authors = ["gift-ledger"]
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+# Tauri 2 标准约定：逻辑放在 lib.rs，便于移动端/测试复用
+name = "gift_ledger_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Tauri 2 核心与官方插件
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+
+# 序列化
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# 本地 SQLite（bundled：编译内置 SQLite，无需用户额外安装）
+rusqlite = { version = "0.32", features = ["bundled", "backup"] }
+
+# 工具库
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4"] }
+thiserror = "1"
+anyhow = "1"
+log = "0.4"
+
+# 全量备份打包（ZIP：db + 图片）
+zip = { version = "2", default-features = false, features = ["deflate"] }
+walkdir = "2"
+
+# 图片本地旋转（Rust 原生实现）
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "bmp", "webp"] }
+
+# 坚果云 WebDAV 同步
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+base64 = "0.22"
+
+[profile.release]
+# 缩小体积、优化性能
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
