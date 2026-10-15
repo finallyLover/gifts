@@ -25,7 +25,13 @@
 
 ## 软件截图
 
-## 技术栈
+### pc端
+
+![1](.\images\1.png)![1](.\images\2.png)![1](.\images\3.png)![1](.\images\4.png)![1](.\images\5.png)![1](.\images\6.png)
+
+### 手机端
+
+![](.\images\a1.jpg)![](.\images\a2.jpg)![](.\images\a3.jpg)![](.\images\a4.jpg)![](.\images\a5.jpg)
 
 | 层 | 技术 |
 | --- | --- |
