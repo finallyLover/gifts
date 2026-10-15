@@ -23,6 +23,17 @@
 - 坚果云 WebDAV 同步数据库（图片同步规划见 Roadmap）
 - 无图片录入能力，使用「直接录入」模式
 
+## 📥 下载安装包
+> 最新版本：**v1.0.0**
+- [Windows 桌面端（电子礼簿.exe）](https://github.com/finallyLover/gifts/releases/download/v1.0.0/default.exe)
+- [Android 移动端（电子礼簿.apk）](https://github.com/finallyLover/gifts/releases/download/v1.0.0/default.apk)
+
+### 使用说明
+- Windows：下载后直接双击 exe 运行，无需安装
+- Android：下载 apk 文件，在手机中允许安装未知来源应用即可安装
+
+
+
 ## 软件截图
 
 ### pc端
