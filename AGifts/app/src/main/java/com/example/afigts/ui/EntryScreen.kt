@@ -27,8 +27,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -82,6 +84,7 @@ fun EntryScreen(archiveId: String, onBack: () -> Unit) {
     var deleteIndex by remember { mutableStateOf<Int?>(null) }
     var askLeave by remember { mutableStateOf(false) }
     var toast by remember { mutableStateOf<String?>(null) }
+    var keyword by remember { mutableStateOf("") }
 
     suspend fun load() {
         archive = Repo.listArchives(includeArchived = true).firstOrNull { it.id == archiveId }
@@ -93,10 +96,20 @@ fun EntryScreen(archiveId: String, onBack: () -> Unit) {
 
     LaunchedEffect(archiveId) { load() }
 
-    // 合计
-    val count = records.size
-    val giftSum = records.sumOf { it.amount }
-    val giftAmountSum = records.sumOf { it.giftAmount }
+    // 搜索过滤：按来宾姓名筛选，保留原下标以便编辑/删除定位到真实行
+    val kw = keyword.trim()
+    val visible: List<Pair<Int, GiftRecord>> = if (kw.isEmpty()) {
+        records.mapIndexed { i, r -> i to r }
+    } else {
+        records.mapIndexedNotNull { i, r ->
+            if (r.guestName.contains(kw, ignoreCase = true)) i to r else null
+        }
+    }
+
+    // 合计：随搜索联动，统计当前显示的记录（未搜索时即整册合计）
+    val count = visible.size
+    val giftSum = visible.sumOf { it.second.amount }
+    val giftAmountSum = visible.sumOf { it.second.giftAmount }
     val totalSum = giftSum + giftAmountSum
 
     suspend fun persist(): Boolean {
@@ -157,29 +170,50 @@ fun EntryScreen(archiveId: String, onBack: () -> Unit) {
             return@Scaffold
         }
         Column(Modifier.fillMaxSize().padding(padding)) {
-            // 合计栏
+            // 合计栏：本礼簿金额统计，随搜索联动（未搜索时即整册合计）
             Surface(
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("共 $count 笔", style = MaterialTheme.typography.bodyMedium)
-                        Spacer(Modifier.width(14.dp))
-                        Text("礼金 ${fmtYuan(giftSum)}", style = MaterialTheme.typography.bodyMedium)
-                        Spacer(Modifier.width(14.dp))
-                        Text("礼品 ${fmtYuan(giftAmountSum)}", style = MaterialTheme.typography.bodyMedium)
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            if (kw.isEmpty()) "共 $count 笔" else "筛选出 $count 笔",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            "合计 ${fmtYuan(totalSum)}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        "合计 ${fmtYuan(totalSum)}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        "礼金 ${fmtYuan(giftSum)} · 礼品 ${fmtYuan(giftAmountSum)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
+            // 搜索框：按来宾姓名过滤，便于快速定位并编辑
+            OutlinedTextField(
+                value = keyword,
+                onValueChange = { keyword = it },
+                placeholder = { Text("搜索来宾姓名") },
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (keyword.isNotEmpty()) {
+                        IconButton(onClick = { keyword = "" }) {
+                            Icon(Icons.Default.Close, contentDescription = "清空")
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
+            )
             toast?.let {
                 Text(
                     it,
@@ -189,27 +223,26 @@ fun EntryScreen(archiveId: String, onBack: () -> Unit) {
                 )
             }
 
-            if (records.isEmpty()) {
-                EmptyHint("暂无记录，点击右下角 + 逐行录入")
-            } else {
-                LazyColumn(
+            when {
+                records.isEmpty() -> EmptyHint("暂无记录，点击右下角 + 逐行录入")
+                visible.isEmpty() -> EmptyHint("未找到「$kw」相关的来宾记录")
+                else -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(records.size) { i ->
-                        val r = records[i]
+                    items(items = visible, key = { it.first }) { (origIndex, r) ->
                         RecordCard(
-                            index = i + 1,
+                            index = origIndex + 1,
                             record = r,
-                            onClick = { editingIndex = i },
+                            onClick = { editingIndex = origIndex },
                             onToggleStatus = {
-                                records[i] = r.copy(
+                                records[origIndex] = r.copy(
                                     status = if (r.status == "confirmed") "pending" else "confirmed"
                                 )
                                 dirty = true
                             },
-                            onDelete = { deleteIndex = i }
+                            onDelete = { deleteIndex = origIndex }
                         )
                     }
                 }
