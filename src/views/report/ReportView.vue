@@ -21,7 +21,12 @@
             <el-col :span="6">
               <el-card shadow="never">
                 <div class="card-label">总笔数</div>
-                <div class="stat-number">{{ archiveStatData.total_count }}</div>
+                <div class="stat-number">
+                  <el-button link type="primary" class="stat-link" @click="openRecords('总笔数明细', {})">
+                    {{ archiveStatData.total_count }}
+                  </el-button>
+                </div>
+                <div class="card-sub">点击查看人员明细</div>
               </el-card>
             </el-col>
             <el-col :span="6">
@@ -35,8 +40,17 @@
               <el-card shadow="never">
                 <div class="card-label">已确认 / 待核对</div>
                 <div class="stat-number">
-                  {{ archiveStatData.confirmed_count }} / {{ archiveStatData.pending_count }}
+                  <el-button link type="success" class="stat-link"
+                    @click="openRecords('已确认明细', { status: 'confirmed' })">
+                    {{ archiveStatData.confirmed_count }}
+                  </el-button>
+                  <span class="stat-sep">/</span>
+                  <el-button link type="warning" class="stat-link"
+                    @click="openRecords('待核对明细', { status: 'pending' })">
+                    {{ archiveStatData.pending_count }}
+                  </el-button>
                 </div>
+                <div class="card-sub">点击数字查看人员明细</div>
               </el-card>
             </el-col>
           </el-row>
@@ -47,7 +61,14 @@
               <div class="table-title">礼金档位分布</div>
               <el-table :data="archiveStatData.amount_brackets" border size="small">
                 <el-table-column prop="label" label="金额档位" />
-                <el-table-column prop="count" label="笔数" width="100" align="right" />
+                <el-table-column label="笔数" width="100" align="right">
+                  <template #default="{ row }">
+                    <el-button link type="primary" :disabled="row.count === 0"
+                      @click="openBracket(row)">
+                      {{ row.count }}
+                    </el-button>
+                  </template>
+                </el-table-column>
                 <el-table-column label="金额(元)" width="140" align="right">
                   <template #default="{ row }">{{ row.amount }}</template>
                 </el-table-column>
@@ -153,13 +174,63 @@
 
     <!-- 个人往来详情抽屉（点击对照表笔数打开） -->
     <PersonDetailDrawer v-model="detailVisible" :person-id="detailPersonId" />
+
+    <!-- 笔数钻取：当前礼簿的人员明细对话框 -->
+    <el-dialog
+      v-model="recordsDialogVisible"
+      :title="recordsDialogTitle"
+      width="820px"
+      append-to-body
+    >
+      <el-table
+        v-loading="recordsLoading"
+        :data="dialogRecords"
+        border
+        size="small"
+        max-height="440"
+      >
+        <el-table-column type="index" label="#" width="50" align="center" />
+        <el-table-column prop="guest_name" label="姓名" width="110" show-overflow-tooltip />
+        <el-table-column label="关系" width="90">
+          <template #default="{ row }">{{ row.relation || '—' }}</template>
+        </el-table-column>
+        <el-table-column label="礼金(元)" width="100" align="right">
+          <template #default="{ row }">{{ row.amount }}</template>
+        </el-table-column>
+        <el-table-column label="礼品（折算）" min-width="160" show-overflow-tooltip>
+          <template #default="{ row }">
+            <template v-if="row.gift">
+              {{ row.gift }}<span v-if="row.gift_amount">（¥{{ row.gift_amount }}）</span>
+            </template>
+            <span v-else>—</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="合计(元)" width="100" align="right">
+          <template #default="{ row }">{{ (row.amount || 0) + (row.gift_amount || 0) }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 'confirmed' ? 'success' : 'warning'" size="small">
+              {{ row.status === 'confirmed' ? '已确认' : '待核对' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="备注" min-width="110" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.remark || '' }}</template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <span class="dialog-total">共 {{ dialogRecords.length }} 笔</span>
+        <el-button @click="recordsDialogVisible = false">关 闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import type {
-  Archive, ArchiveStat, GlobalStat, PersonSummary
+  Archive, ArchiveStat, GiftRecord, GlobalStat, GroupStat, PersonSummary, RecordFilter
 } from '@/types'
 import { listArchives } from '@/api/archive'
 import {
@@ -178,6 +249,40 @@ const archiveStatData = ref<ArchiveStat | null>(null)
 async function loadArchiveStat() {
   if (!archiveId.value) return
   archiveStatData.value = await getArchiveStat(archiveId.value)
+}
+
+// ---- 笔数钻取：人员明细对话框 ----
+const recordsDialogVisible = ref(false)
+const recordsLoading = ref(false)
+const recordsDialogTitle = ref('')
+const dialogRecords = ref<GiftRecord[]>([])
+
+/// 金额档位 -> 礼金区间（与后端 archive_stat 的分桶边界严格对应，金额最多两位小数）
+const BRACKET_RANGES: Record<string, Pick<RecordFilter, 'min_amount' | 'max_amount'>> = {
+  '200以下': { max_amount: 199.99 },
+  '200-499': { min_amount: 200, max_amount: 499.99 },
+  '500-999': { min_amount: 500, max_amount: 999.99 },
+  '1000-1999': { min_amount: 1000, max_amount: 1999.99 },
+  '2000以上': { min_amount: 2000 }
+}
+
+/// 打开人员明细对话框；filter 在当前礼簿范围内追加筛选条件
+async function openRecords(title: string, filter: RecordFilter) {
+  if (!archiveId.value) return
+  recordsDialogTitle.value = title
+  dialogRecords.value = []
+  recordsDialogVisible.value = true
+  recordsLoading.value = true
+  try {
+    dialogRecords.value = await listRecords({ archive_id: archiveId.value, ...filter })
+  } finally {
+    recordsLoading.value = false
+  }
+}
+
+/// 点击礼金档位的笔数
+function openBracket(row: GroupStat) {
+  openRecords(`礼金档位「${row.label}」人员明细`, BRACKET_RANGES[row.label] ?? {})
 }
 
 // ---- 全局统计 ----
@@ -287,6 +392,35 @@ onMounted(async () => {
 }
 .stat-cards {
   margin-bottom: 16px;
+}
+/* 同一行指标卡等高（内容上下居中） */
+.stat-cards :deep(.el-col) {
+  display: flex;
+}
+.stat-cards :deep(.el-card) {
+  width: 100%;
+}
+.stat-cards :deep(.el-card__body) {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+/* 卡片内可点击的数字链接 */
+.stat-link {
+  font-size: 22px;
+  font-weight: 600;
+  height: auto;
+  padding: 0;
+}
+.stat-sep {
+  margin: 0 6px;
+  color: #909399;
+}
+.dialog-total {
+  float: left;
+  font-size: 13px;
+  color: #909399;
+  line-height: 28px;
 }
 .card-label {
   font-size: 13px;
