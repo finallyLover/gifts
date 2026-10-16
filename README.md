@@ -25,8 +25,14 @@
 
 ## 📥 下载安装包
 > 最新版本：**v1.0.0**
-- [Windows 桌面端（电子礼簿.exe）](https://github.com/finallyLover/gifts/releases/download/v1.0.0/default.exe)
-- [Android 移动端（电子礼簿.apk）](https://github.com/finallyLover/gifts/releases/download/v1.0.0/default.apk)
+
+**GitHub**
+- [Windows 桌面端（afigts.exe）](https://github.com/finallyLover/gifts/releases/download/v1.0.0/afigts.exe)
+- [Android 移动端（afigts.apk）](https://github.com/finallyLover/gifts/releases/download/v1.0.0/afigts.apk)
+
+**Gitee**
+- [Windows 桌面端（电子礼簿.exe）](https://gitee.com/finallylover/gifts/releases/download/v1.0.0/电子礼簿.exe)
+- [Android 移动端（电子礼薄.apk）](https://gitee.com/finallylover/gifts/releases/download/v1.0.0/电子礼薄.apk)
 
 ### 使用说明
 - Windows：下载后直接双击 exe 运行，无需安装
